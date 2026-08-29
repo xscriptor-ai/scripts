@@ -4,13 +4,10 @@ Utility scripts for installing, validating, generating, and managing Xscriptor A
 
 ## Contents
 
-- `install-agents.sh` — install agents/skills/commands into OpenCode or Claude Code
-- `validate/` — validate agent definitions
-- `generate/` — scaffold new agents
-- `stats/` — agent statistics
-- `docs/`, `diff/`, `backup/`, `audit/` — supporting utilities
+- `install-agents.sh` — installer (repo root)
+- `scripts/` — supporting utilities: `validate/`, `generate/`, `stats/`, `docs/`, `diff/`, `backup/`, `audit/`
 
-Full registry: [xscriptor-ai/agents-hub](https://github.com/xscriptor-ai/agents-hub)
+Full registry: [xscriptor-ai/agents](https://github.com/xscriptor-ai/agents)
 
 ## License
 

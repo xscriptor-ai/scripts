@@ -20,7 +20,7 @@ done
   echo "# OpenCode Agents — Complete Reference"
   echo ""
   echo "Generated: $(date '+%Y-%m-%d %H:%M:%S UTC')"
-  echo "Repository: https://github.com/xscriptor/ai"
+  echo "Repository: https://github.com/xscriptor-ai/scripts"
   echo ""
 
   TOTAL=0
