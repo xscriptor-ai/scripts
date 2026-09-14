@@ -5,13 +5,30 @@ Usage: ./stats/agent-stats.py [--agents PATH] [--format text|json]
 import argparse, collections, json, os, re, sys
 from pathlib import Path
 
+def default_agents_dir():
+    env = os.environ.get('XSCRIPTOR_AGENTS_DIR')
+    if env:
+        base = Path(env)
+        if (base / 'agents' / 'agents').is_dir():
+            return base / 'agents' / 'agents'
+        if (base / 'languages').is_dir():
+            return base
+        return base / 'agents'
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    sibling = repo_root.parent / 'agents'
+    if (sibling / 'agents').is_dir():
+        return sibling / 'agents'
+    if (sibling / 'languages').is_dir():
+        return sibling
+    return sibling / 'agents'
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--agents', default=None)
     parser.add_argument('--format', default='text', choices=['text', 'json'])
     args = parser.parse_args()
 
-    agents_dir = Path(args.agents) if args.agents else Path(__file__).resolve().parent.parent.parent / 'agents'
+    agents_dir = Path(args.agents) if args.agents else default_agents_dir()
     if not agents_dir.is_dir():
         print(f"Error: agents directory not found: {agents_dir}", file=sys.stderr)
         sys.exit(1)

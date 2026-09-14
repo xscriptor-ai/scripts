@@ -6,8 +6,10 @@
 
 <pre><code>./diff/diff-agents.sh
 ./diff/diff-agents.sh --local ~/.config/opencode/agents
-./diff/diff-agents.sh --local ~/.config/opencode/agents --repo ../agents
+./diff/diff-agents.sh --local ~/.config/opencode/agents --repo ../agents/agents
 ./diff/diff-agents.sh --missing-only</code></pre>
+
+<p>The agents repo is auto-detected as a sibling checkout (<code>../agents/agents</code>), or set <code>XSCRIPTOR_AGENTS_DIR</code>.</p>
 
 <h2>Output</h2>
 

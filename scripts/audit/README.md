@@ -5,8 +5,10 @@
 <h2>Usage</h2>
 
 <pre><code>./audit/check-permissions.sh
-./audit/check-permissions.sh --agents ../agents
+./audit/check-permissions.sh --agents ../agents/agents
 ./audit/check-permissions.sh --risk-only</code></pre>
+
+<p>The agents repo is auto-detected as a sibling checkout (<code>../agents/agents</code>), or set <code>XSCRIPTOR_AGENTS_DIR</code>.</p>
 
 <h2>Checks</h2>
 

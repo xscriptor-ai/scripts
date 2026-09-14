@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Install all Xscriptor AI agents and skills for OpenCode.
 #
-# Sources:
-#   agents/          181 specialized agents
-#   senior/agents/    24 consolidated senior agents
-#   skills/            3 project skills (xscriptor, devx, samurai)
-#   senior/skills/    18 deep-reference skills
+# Sources (repos xscriptor-ai/agents + xscriptor-ai/skills):
+#   agents repo:  181 specialized agents + 24 consolidated senior agents
+#   skills repo:  3 project skills (xscriptor, devx, samurai), 18 senior skills, 8 commands
+#
+# Source resolution: sibling checkouts of the agents/skills repos, or
+# XSCRIPTOR_AGENTS_DIR / XSCRIPTOR_SKILLS_DIR overrides. If not found, the
+# repos are downloaded (XSCRIPTOR_REF, default main).
 #
 # Remote:
 #   curl -fsSL https://raw.githubusercontent.com/xscriptor-ai/scripts/main/install-agents.sh | bash
@@ -23,19 +25,93 @@
 #   ./install-agents.sh --dry-run          # Preview only
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-AGENTS_SRC="$REPO_DIR/agents"
-SENIOR_SRC="$REPO_DIR/senior/agents"
-SKILLS_SRC="$REPO_DIR/skills"
-SENIOR_SKILLS_SRC="$REPO_DIR/senior/skills"
-COMMANDS_SRC="$REPO_DIR/commands"
+XSCRIPTOR_REF="${XSCRIPTOR_REF:-main}"
+
+if [[ -n "${BASH_SOURCE[0]:-}" && -f "${BASH_SOURCE[0]:-}" ]]; then
+  REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+  REPO_DIR=""
+fi
+PARENT_DIR=""
+[[ -n "$REPO_DIR" ]] && PARENT_DIR="$(cd "$REPO_DIR/.." && pwd)"
+
+AGENTS_SRC=""
+SENIOR_SRC=""
+SKILLS_SRC=""
+SENIOR_SKILLS_SRC=""
+COMMANDS_SRC=""
+TMP_DIR=""
+
+detect_agents() {
+  local base="$1"
+  if [[ -d "$base/agents/agents" && -d "$base/agents/senior/agents" ]]; then
+    AGENTS_SRC="$base/agents/agents"
+    SENIOR_SRC="$base/agents/senior/agents"
+  elif [[ -d "$base/agents/languages" && -d "$base/senior/agents" ]]; then
+    AGENTS_SRC="$base/agents"
+    SENIOR_SRC="$base/senior/agents"
+  else
+    return 1
+  fi
+}
+
+detect_skills() {
+  local base="$1"
+  if [[ -d "$base/skills/skills" && -d "$base/skills/senior/skills" ]]; then
+    SKILLS_SRC="$base/skills/skills"
+    SENIOR_SKILLS_SRC="$base/skills/senior/skills"
+    COMMANDS_SRC="$base/skills/commands"
+  elif [[ -d "$base/skills/web" && -d "$base/senior/skills" ]]; then
+    SKILLS_SRC="$base/skills"
+    SENIOR_SKILLS_SRC="$base/senior/skills"
+    COMMANDS_SRC="$base/commands"
+  else
+    return 1
+  fi
+}
+
+download_repo() {
+  local repo="$1" dest="$2"
+  mkdir -p "$dest"
+  local url="https://codeload.github.com/xscriptor-ai/$repo/tar.gz/refs/heads/$XSCRIPTOR_REF"
+  if command -v curl >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
+    echo "    downloading xscriptor-ai/$repo@$XSCRIPTOR_REF"
+    curl -fsSL "$url" | tar -xz -C "$dest" --strip-components=1
+  else
+    rm -rf "$dest"
+    git clone --depth 1 --branch "$XSCRIPTOR_REF" "https://github.com/xscriptor-ai/$repo.git" "$dest"
+  fi
+}
+
+for base in "${XSCRIPTOR_AGENTS_DIR:-}" "${XSCRIPTOR_SKILLS_DIR:-}" "$PARENT_DIR"; do
+  [[ -z "$base" ]] && continue
+  if [[ -z "$AGENTS_SRC" ]]; then detect_agents "$base" || true; fi
+  if [[ -z "$SKILLS_SRC" ]]; then detect_skills "$base" || true; fi
+done
+
+ensure_sources() {
+  if [[ -n "$AGENTS_SRC" && -n "$SKILLS_SRC" ]]; then return; fi
+  TMP_DIR="$(mktemp -d)"
+  trap 'rm -rf "$TMP_DIR"' EXIT
+  if [[ -z "$AGENTS_SRC" ]]; then
+    download_repo agents "$TMP_DIR/agents-repo"
+    detect_agents "$TMP_DIR/agents-repo" || { echo "error: invalid agents repo" >&2; exit 1; }
+  fi
+  if [[ -z "$SKILLS_SRC" ]]; then
+    download_repo skills "$TMP_DIR/skills-repo"
+    detect_skills "$TMP_DIR/skills-repo" || { echo "error: invalid skills repo" >&2; exit 1; }
+  fi
+}
 
 # --- Group definitions ---
 ALL_GROUPS=(
   general languages web/security web/architecture web/frontend web/backend
   mobile data-ml cloud testing graphql embedded game-dev content observability compliance
-  security/recon security/web-pentest security/mobile-pentest security/desktop
-  security/red-team security/blue-team
+  security/recon security/web-pentest security/mobile-pentest security/desktop security/red-team
+  security/blue-team security/ai-ml-security security/purple-team
+  automotive-security aviation-security blockchain-security github hardware-security
+  mainframe-security maritime-security medical-security mega physical-security
+  privacy-engineering systems telecom-security
 )
 
 SENIOR_GROUPS=(
@@ -124,6 +200,7 @@ while [[ $# -gt 0 ]]; do
     --project) DEST_MODE="project"; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     --list)
+      ensure_sources
       echo "Available agent groups:"
       for g in "${ALL_GROUPS[@]}"; do
         c=$(find "$AGENTS_SRC/$g" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
@@ -143,6 +220,8 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown: $1"; usage; exit 1 ;;
   esac
 done
+
+ensure_sources
 
 # --- Resolve destination ---
 if [[ "$DEST_MODE" == "project" ]]; then
@@ -216,39 +295,94 @@ install_skill() {
 }
 
 # --- Mode dispatch ---
-if [[ "$MODE" == "all" || "$MODE" == "agents" || "$MODE" == "groups" ]]; then
-  if [[ "$MODE" == "groups" ]]; then
-    install_agents "$AGENTS_SRC" "$AGENTS_DST" "Agents" "${GROUP_SELECT[@]}"
-  else
-    install_agents "$AGENTS_SRC" "$AGENTS_DST" "Specialized Agents" "${ALL_GROUPS[@]}"
-  fi
-fi
+RUN_STANDARD=1
 
-if [[ "$MODE" == "all" || "$MODE" == "senior" ]]; then
-  install_agents "$SENIOR_SRC" "$AGENTS_DST" "Senior Agents" "${SENIOR_GROUPS[@]}"
-fi
+ask_yes() {
+  local ans
+  read -r -p "$1 [Y/n] " ans || true
+  [[ -z "$ans" || "$ans" =~ ^[Yy] ]]
+}
 
-if [[ "$MODE" == "all" || "$MODE" == "commands" ]]; then
+install_commands() {
   echo "  [Commands]"
   if [[ -d "$COMMANDS_SRC" ]]; then
     for cmd in "$COMMANDS_SRC"/*.md; do
-      if [[ -f "$cmd" ]]; then
+      if [[ -f "$cmd" && "$(basename "$cmd")" != "README.md" ]]; then
         copy_file "$cmd" "$COMMANDS_DST/$(basename "$cmd")"
       fi
     done
   fi
-fi
+}
 
-if [[ "$MODE" == "all" || "$MODE" == "skills" ]]; then
+install_all_skills() {
   echo "  [Skills]"
-  # Regular skills
   install_skill "xscriptor" "$SKILLS_SRC/web/literature/xscriptor" "$SKILLS_DST"
   install_skill "devx" "$SKILLS_SRC/web/dev/devx/devx" "$SKILLS_DST"
   install_skill "samurai" "$SKILLS_SRC/web/cybersec/samurai" "$SKILLS_DST"
-  # Senior skills
   for sk in "${SENIOR_SKILLS[@]}"; do
     install_skill "$sk" "$SENIOR_SKILLS_SRC/$sk" "$SKILLS_DST"
   done
+}
+
+if [[ "$MODE" == "interactive" ]]; then
+  RUN_STANDARD=0
+  echo "Select specialized agent groups:"
+  idx=1
+  for g in "${ALL_GROUPS[@]}"; do
+    c=$(find "$AGENTS_SRC/$g" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+    printf '  %2d) %-28s %s agents\n' "$idx" "$g" "$c"
+    idx=$((idx + 1))
+  done
+  echo "  Enter numbers separated by commas (e.g. 1,3,5), or leave empty for all:"
+  read -r -p "> " selection || true
+  GROUP_SELECT=()
+  if [[ -z "${selection:-}" ]]; then
+    GROUP_SELECT=("${ALL_GROUPS[@]}")
+  else
+    IFS=',' read -ra nums <<< "$selection"
+    for n in "${nums[@]}"; do
+      n="${n// /}"
+      if [[ "$n" =~ ^[0-9]+$ ]] && (( n >= 1 && n <= ${#ALL_GROUPS[@]} )); then
+        GROUP_SELECT+=("${ALL_GROUPS[$((n - 1))]}")
+      else
+        echo "  ignoring invalid selection: $n" >&2
+      fi
+    done
+  fi
+  if [[ ${#GROUP_SELECT[@]} -gt 0 ]]; then
+    install_agents "$AGENTS_SRC" "$AGENTS_DST" "Specialized Agents" "${GROUP_SELECT[@]}"
+  fi
+  if ask_yes "Install senior agents?"; then
+    install_agents "$SENIOR_SRC" "$AGENTS_DST" "Senior Agents" "${SENIOR_GROUPS[@]}"
+  fi
+  if ask_yes "Install commands?"; then
+    install_commands
+  fi
+  if ask_yes "Install skills (project + senior)?"; then
+    install_all_skills
+  fi
+fi
+
+if [[ "$RUN_STANDARD" == 1 ]]; then
+  if [[ "$MODE" == "all" || "$MODE" == "agents" || "$MODE" == "groups" ]]; then
+    if [[ "$MODE" == "groups" ]]; then
+      install_agents "$AGENTS_SRC" "$AGENTS_DST" "Agents" "${GROUP_SELECT[@]}"
+    else
+      install_agents "$AGENTS_SRC" "$AGENTS_DST" "Specialized Agents" "${ALL_GROUPS[@]}"
+    fi
+  fi
+
+  if [[ "$MODE" == "all" || "$MODE" == "senior" ]]; then
+    install_agents "$SENIOR_SRC" "$AGENTS_DST" "Senior Agents" "${SENIOR_GROUPS[@]}"
+  fi
+
+  if [[ "$MODE" == "all" || "$MODE" == "commands" ]]; then
+    install_commands
+  fi
+
+  if [[ "$MODE" == "all" || "$MODE" == "skills" ]]; then
+    install_all_skills
+  fi
 fi
 
 # --- Report ---

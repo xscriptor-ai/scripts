@@ -4,7 +4,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-AGENTS_DIR="${SCRIPT_DIR}/agents"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+resolve_agents_dir() {
+  if [[ -n "${XSCRIPTOR_AGENTS_DIR:-}" ]]; then
+    if [[ -d "${XSCRIPTOR_AGENTS_DIR}/agents/agents" ]]; then echo "${XSCRIPTOR_AGENTS_DIR}/agents/agents"
+    elif [[ -d "${XSCRIPTOR_AGENTS_DIR}/languages" ]]; then echo "${XSCRIPTOR_AGENTS_DIR}"
+    else echo "${XSCRIPTOR_AGENTS_DIR}/agents"; fi
+  elif [[ -d "${REPO_ROOT}/../agents/agents" ]]; then echo "$(cd "${REPO_ROOT}/../agents/agents" && pwd)"
+  elif [[ -d "${REPO_ROOT}/../agents/languages" ]]; then echo "$(cd "${REPO_ROOT}/../agents" && pwd)"
+  else echo "${REPO_ROOT}/../agents/agents"; fi
+}
+AGENTS_DIR="$(resolve_agents_dir)"
 FORMAT="text"
 
 while [[ $# -gt 0 ]]; do
@@ -24,8 +35,8 @@ TOTAL_FILES=0
 
 while IFS= read -r -d '' file; do
   GROUP=$(basename "$(dirname "$file")")
-  GROUP_COUNTS["$GROUP"]=$((GROUP_COUNTS["$GROUP"] + 1))
-  ((TOTAL_FILES++))
+  GROUP_COUNTS["$GROUP"]=$(( ${GROUP_COUNTS["$GROUP"]:-0} + 1 ))
+  TOTAL_FILES=$((TOTAL_FILES + 1))
   LINES=$(wc -l < "$file")
   TOTAL_LINES=$((TOTAL_LINES + LINES))
 
@@ -34,18 +45,18 @@ while IFS= read -r -d '' file; do
   if grep -q '^temperature:' <<< "$content"; then
     temp_val=$(grep '^temperature:' <<< "$content" | head -1 | sed 's/.*: *//')
     bucket=$(awk "BEGIN {printf \"%.1f\", int($temp_val * 10) / 10}")
-    TEMP_BUCKETS["$bucket"]=$((TEMP_BUCKETS["$bucket"] + 1))
+    TEMP_BUCKETS["$bucket"]=$(( ${TEMP_BUCKETS["$bucket"]:-0} + 1 ))
   fi
 
   if grep -q '^color:' <<< "$content"; then
     color_val=$(grep '^color:' <<< "$content" | head -1 | sed 's/.*: *//' | tr -d '"')
-    COLOR_COUNTS["$color_val"]=$((COLOR_COUNTS["$color_val"] + 1))
+    COLOR_COUNTS["$color_val"]=$(( ${COLOR_COUNTS["$color_val"]:-0} + 1 ))
   fi
 
   for tool in edit bash glob grep read list webfetch; do
     if grep -qi "$tool:" <<< "$content"; then
       val=$(grep -i "$tool:" <<< "$content" | head -1 | sed 's/.*:[[:space:]]*//')
-      PERM_COUNTS["$tool|$val"]=$((PERM_COUNTS["$tool|$val"] + 1))
+      PERM_COUNTS["$tool|$val"]=$(( ${PERM_COUNTS["$tool|$val"]:-0} + 1 ))
     fi
   done
 done < <(find "$AGENTS_DIR" -name '*.md' ! -name 'README.md' -print0 2>/dev/null)

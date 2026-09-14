@@ -5,8 +5,10 @@
 <h2>Usage</h2>
 
 <pre><code>./stats/agent-stats.py
-./stats/agent-stats.py --agents ../agents
+./stats/agent-stats.py --agents ../agents/agents
 ./stats/agent-stats.py --format json</code></pre>
+
+<p>The agents repo is auto-detected as a sibling checkout (<code>../agents/agents</code>), or set <code>XSCRIPTOR_AGENTS_DIR</code>.</p>
 
 <h2>Output</h2>
 

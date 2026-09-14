@@ -3,8 +3,21 @@
 # Usage: ./diff/diff-agents.sh [--local PATH] [--repo PATH] [--missing-only]
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+resolve_agents_dir() {
+  if [[ -n "${XSCRIPTOR_AGENTS_DIR:-}" ]]; then
+    if [[ -d "${XSCRIPTOR_AGENTS_DIR}/agents/agents" ]]; then echo "${XSCRIPTOR_AGENTS_DIR}/agents/agents"
+    elif [[ -d "${XSCRIPTOR_AGENTS_DIR}/languages" ]]; then echo "${XSCRIPTOR_AGENTS_DIR}"
+    else echo "${XSCRIPTOR_AGENTS_DIR}/agents"; fi
+  elif [[ -d "${REPO_ROOT}/../agents/agents" ]]; then echo "$(cd "${REPO_ROOT}/../agents/agents" && pwd)"
+  elif [[ -d "${REPO_ROOT}/../agents/languages" ]]; then echo "$(cd "${REPO_ROOT}/../agents" && pwd)"
+  else echo "${REPO_ROOT}/../agents/agents"; fi
+}
+
 LOCAL="${HOME}/.config/opencode/agents"
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/agents"
+REPO="$(resolve_agents_dir)"
 MISSING_ONLY=false
 
 while [[ $# -gt 0 ]]; do
@@ -26,7 +39,7 @@ while IFS= read -r -d '' f; do
   name=$(basename "$f")
   if [[ ! -f "$REPO/$name" ]]; then
     echo "  - $name"
-    ((LOCAL_ONLY++))
+    LOCAL_ONLY=$((LOCAL_ONLY + 1))
   fi
 done < <(find "$LOCAL" -name '*.md' -print0 2>/dev/null || true)
 
@@ -38,7 +51,7 @@ while IFS= read -r -d '' f; do
   name=$(basename "$f")
   if [[ ! -f "$LOCAL/$name" ]]; then
     echo "  - $name"
-    ((REPO_ONLY++))
+    REPO_ONLY=$((REPO_ONLY + 1))
   fi
 done < <(find "$REPO" -name '*.md' ! -name 'README.md' -print0 2>/dev/null)
 
@@ -55,7 +68,7 @@ if ! $MISSING_ONLY; then
       local_size=$(stat -f%z "$local_f" 2>/dev/null || stat -c%s "$local_f" 2>/dev/null)
       if [[ "$repo_size" != "$local_size" ]]; then
         echo "  - $name (repo: ${repo_size}B, local: ${local_size}B)"
-        ((MODIFIED++))
+        MODIFIED=$((MODIFIED + 1))
       fi
     fi
   done < <(find "$REPO" -name '*.md' ! -name 'README.md' -print0 2>/dev/null)

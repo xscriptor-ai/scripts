@@ -4,7 +4,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-AGENTS_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)/agents"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+resolve_agents_dir() {
+  if [[ -n "${XSCRIPTOR_AGENTS_DIR:-}" ]]; then
+    if [[ -d "${XSCRIPTOR_AGENTS_DIR}/agents/agents" ]]; then echo "${XSCRIPTOR_AGENTS_DIR}/agents/agents"
+    elif [[ -d "${XSCRIPTOR_AGENTS_DIR}/languages" ]]; then echo "${XSCRIPTOR_AGENTS_DIR}"
+    else echo "${XSCRIPTOR_AGENTS_DIR}/agents"; fi
+  elif [[ -d "${REPO_ROOT}/../agents/agents" ]]; then echo "$(cd "${REPO_ROOT}/../agents/agents" && pwd)"
+  elif [[ -d "${REPO_ROOT}/../agents/languages" ]]; then echo "$(cd "${REPO_ROOT}/../agents" && pwd)"
+  else echo "${REPO_ROOT}/../agents/agents"; fi
+}
+AGENTS_DIR="$(resolve_agents_dir)"
 STRICT_MODE=false
 
 while [[ $# -gt 0 ]]; do
@@ -21,20 +32,20 @@ FILES=0
 
 while IFS= read -r -d '' file; do
   NAME=$(basename "$file")
-  ((FILES++))
+  FILES=$((FILES + 1))
   content=$(<"$file")
 
   # 1. Must start with ---
   if [[ "$content" != ---* ]]; then
     echo "  ERROR: $NAME - missing frontmatter (must start with ---)"
-    ((ERRORS++))
+    ERRORS=$((ERRORS + 1))
     continue
   fi
 
   # 2. Description required
   if ! grep -q '^description:' <<< "$content"; then
     echo "  ERROR: $NAME - missing description field"
-    ((ERRORS++))
+    ERRORS=$((ERRORS + 1))
   fi
 
   # 3. Mode must be valid
@@ -42,7 +53,7 @@ while IFS= read -r -d '' file; do
     mode_val=$(grep '^mode:' <<< "$content" | head -1 | sed 's/.*: *//')
     if [[ "$mode_val" != "subagent" && "$mode_val" != "primary" && "$mode_val" != "all" ]]; then
       echo "  ERROR: $NAME - mode must be subagent, primary, or all (got: $mode_val)"
-      ((ERRORS++))
+      ERRORS=$((ERRORS + 1))
     fi
   fi
 
@@ -51,7 +62,7 @@ while IFS= read -r -d '' file; do
     temp_val=$(grep '^temperature:' <<< "$content" | head -1 | sed 's/.*: *//')
     if ! awk "BEGIN {exit !($temp_val < 0 || $temp_val > 1)}" 2>/dev/null; then
       echo "  WARN: $NAME - temperature outside 0.0-1.0 range ($temp_val)"
-      ((WARNINGS++))
+      WARNINGS=$((WARNINGS + 1))
     fi
   fi
 
@@ -60,7 +71,7 @@ while IFS= read -r -d '' file; do
     color_val=$(grep '^color:' <<< "$content" | head -1 | sed 's/.*: *//' | tr -d '"')
     if ! [[ "$color_val" =~ ^#?[0-9a-fA-F]{6}$ || "$color_val" =~ ^(primary|secondary|accent|error|warning|success|info)$ ]]; then
       echo "  WARN: $NAME - unusual color format ($color_val)"
-      ((WARNINGS++))
+      WARNINGS=$((WARNINGS + 1))
     fi
   fi
 
@@ -72,7 +83,7 @@ while IFS= read -r -d '' file; do
       perm_val=$(echo "$line" | sed 's/.*:[[:space:]]*//')
       if [[ "$perm_val" != "allow" && "$perm_val" != "ask" && "$perm_val" != "deny" ]]; then
         echo "  WARN: $NAME - unusual permission value ($perm_val)"
-        ((WARNINGS++))
+        WARNINGS=$((WARNINGS + 1))
       fi
     fi
   done < <(sed -n '/^permission:/,/^---$/p' <<< "$content" | tail -n +2 | head -n -1)
@@ -81,7 +92,7 @@ while IFS= read -r -d '' file; do
   if $STRICT_MODE && grep -q '^model:' <<< "$content"; then
     model_val=$(grep '^model:' <<< "$content" | head -1 | sed 's/.*: *//')
     echo "  WARN: $NAME - model set to $model_val (agents should be model-agnostic)"
-    ((WARNINGS++))
+    WARNINGS=$((WARNINGS + 1))
   fi
 
   echo "  OK: $NAME"

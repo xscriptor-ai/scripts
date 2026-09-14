@@ -5,7 +5,9 @@
 <h2>Usage</h2>
 
 <pre><code>./generate/generate-agent.sh
-./generate/generate-agent.sh --output ../agents/custom</code></pre>
+./generate/generate-agent.sh --output ../agents/agents/custom</code></pre>
+
+<p>Default output goes to the auto-detected agents repo (<code>../agents/agents/custom</code>), or set <code>XSCRIPTOR_AGENTS_DIR</code>.</p>
 
 <h2>What It Prompts</h2>
 

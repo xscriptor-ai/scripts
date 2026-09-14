@@ -4,7 +4,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-AGENTS_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)/agents"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+resolve_agents_dir() {
+  if [[ -n "${XSCRIPTOR_AGENTS_DIR:-}" ]]; then
+    if [[ -d "${XSCRIPTOR_AGENTS_DIR}/agents/agents" ]]; then echo "${XSCRIPTOR_AGENTS_DIR}/agents/agents"
+    elif [[ -d "${XSCRIPTOR_AGENTS_DIR}/languages" ]]; then echo "${XSCRIPTOR_AGENTS_DIR}"
+    else echo "${XSCRIPTOR_AGENTS_DIR}/agents"; fi
+  elif [[ -d "${REPO_ROOT}/../agents/agents" ]]; then echo "$(cd "${REPO_ROOT}/../agents/agents" && pwd)"
+  elif [[ -d "${REPO_ROOT}/../agents/languages" ]]; then echo "$(cd "${REPO_ROOT}/../agents" && pwd)"
+  else echo "${REPO_ROOT}/../agents/agents"; fi
+}
+AGENTS_DIR="$(resolve_agents_dir)"
 RISK_ONLY=false
 
 while [[ $# -gt 0 ]]; do
@@ -30,28 +41,28 @@ while IFS= read -r -d '' file; do
 
   if grep -qi 'edit: allow' <<< "$content"; then
     HAS_EDIT=true
-    ((HIGH_RISK++))
+    HIGH_RISK=$((HIGH_RISK + 1))
     echo "  HIGH RISK: $NAME - edit: allow"
   fi
 
   if grep -qi 'bash: allow' <<< "$content"; then
     HAS_BASH=true
-    ((MEDIUM_RISK++))
+    MEDIUM_RISK=$((MEDIUM_RISK + 1))
     $RISK_ONLY || echo "  MEDIUM: $NAME - bash: allow"
   fi
 
   if $HAS_EDIT && $HAS_BASH; then
-    ((WARNINGS++))
+    WARNINGS=$((WARNINGS + 1))
     echo "  WARNING: $NAME - both edit AND bash are set to allow"
   fi
 
   if ! grep -q '^description:' <<< "$content"; then
-    ((MISSING_DESC++))
+    MISSING_DESC=$((MISSING_DESC + 1))
     echo "  MISSING: $NAME - no description"
   fi
 
   if ! grep -q '^color:' <<< "$content"; then
-    ((MISSING_COLOR++))
+    MISSING_COLOR=$((MISSING_COLOR + 1))
     echo "  NO COLOR: $NAME - no color set"
   fi
 done < <(find "$AGENTS_DIR" -name '*.md' ! -name 'README.md' -print0 2>/dev/null)
