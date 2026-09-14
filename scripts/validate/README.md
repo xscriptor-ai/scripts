@@ -5,8 +5,10 @@
 <h2>Usage</h2>
 
 <pre><code>./validate/validate-agents.sh
-./validate/validate-agents.sh --agents ../agents
-./validate/validate-agents.sh --agents ../agents --strict</code></pre>
+./validate/validate-agents.sh --agents ../agents/agents
+./validate/validate-agents.sh --agents ../agents/agents --strict</code></pre>
+
+<p>The agents repo is auto-detected as a sibling checkout (<code>../agents/agents</code>), or set <code>XSCRIPTOR_AGENTS_DIR</code>.</p>
 
 <h2>Checks Performed</h2>
 

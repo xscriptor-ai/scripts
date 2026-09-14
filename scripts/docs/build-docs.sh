@@ -4,7 +4,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-AGENTS_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)/agents"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+resolve_agents_dir() {
+  if [[ -n "${XSCRIPTOR_AGENTS_DIR:-}" ]]; then
+    if [[ -d "${XSCRIPTOR_AGENTS_DIR}/agents/agents" ]]; then echo "${XSCRIPTOR_AGENTS_DIR}/agents/agents"
+    elif [[ -d "${XSCRIPTOR_AGENTS_DIR}/languages" ]]; then echo "${XSCRIPTOR_AGENTS_DIR}"
+    else echo "${XSCRIPTOR_AGENTS_DIR}/agents"; fi
+  elif [[ -d "${REPO_ROOT}/../agents/agents" ]]; then echo "$(cd "${REPO_ROOT}/../agents/agents" && pwd)"
+  elif [[ -d "${REPO_ROOT}/../agents/languages" ]]; then echo "$(cd "${REPO_ROOT}/../agents" && pwd)"
+  else echo "${REPO_ROOT}/../agents/agents"; fi
+}
+AGENTS_DIR="$(resolve_agents_dir)"
 OUTPUT="${SCRIPT_DIR}/AGENTS-COMPLETE.md"
 FORMAT="markdown"
 
