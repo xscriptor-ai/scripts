@@ -2,8 +2,8 @@
 # Install all Xscriptor AI agents and skills for OpenCode.
 #
 # Sources (repos xscriptor-ai/agents + xscriptor-ai/skills):
-#   agents repo:  181 specialized agents + 24 consolidated senior agents
-#   skills repo:  3 project skills (xscriptor, devx, samurai), 18 senior skills, 8 commands
+#   agents repo:  181 specialized agents + 24 consolidated senior agents + 8 commands
+#   skills repo:  4 project skills (xscriptor, devx, samurai, xglassmorphism) + 18 senior skills
 #
 # Source resolution: sibling checkouts of the agents/skills repos, or
 # XSCRIPTOR_AGENTS_DIR / XSCRIPTOR_SKILLS_DIR overrides. If not found, the
@@ -47,27 +47,36 @@ detect_agents() {
   if [[ -d "$base/agents/agents" && -d "$base/agents/senior/agents" ]]; then
     AGENTS_SRC="$base/agents/agents"
     SENIOR_SRC="$base/agents/senior/agents"
+    if [[ -d "$base/agents/claude/commands" ]]; then COMMANDS_SRC="$base/agents/claude/commands"; fi
   elif [[ -d "$base/agents/languages" && -d "$base/senior/agents" ]]; then
     AGENTS_SRC="$base/agents"
     SENIOR_SRC="$base/senior/agents"
+    if [[ -d "$base/claude/commands" ]]; then COMMANDS_SRC="$base/claude/commands"; fi
   else
     return 1
   fi
+  if [[ -z "$COMMANDS_SRC" && -d "$base/commands" ]]; then COMMANDS_SRC="$base/commands"; fi
+  return 0
 }
 
 detect_skills() {
   local base="$1"
-  if [[ -d "$base/skills/skills" && -d "$base/skills/senior/skills" ]]; then
+  if [[ -d "$base/web-fullstack" && -d "$base/senior" ]]; then
+    SKILLS_SRC="$base"
+    SENIOR_SKILLS_SRC="$base/senior"
+  elif [[ -d "$base/skills/web-fullstack" && -d "$base/skills/senior" ]]; then
+    SKILLS_SRC="$base/skills"
+    SENIOR_SKILLS_SRC="$base/skills/senior"
+  elif [[ -d "$base/skills/skills" && -d "$base/skills/senior/skills" ]]; then
     SKILLS_SRC="$base/skills/skills"
     SENIOR_SKILLS_SRC="$base/skills/senior/skills"
-    COMMANDS_SRC="$base/skills/commands"
   elif [[ -d "$base/skills/web" && -d "$base/senior/skills" ]]; then
     SKILLS_SRC="$base/skills"
     SENIOR_SKILLS_SRC="$base/senior/skills"
-    COMMANDS_SRC="$base/commands"
   else
     return 1
   fi
+  return 0
 }
 
 download_repo() {
@@ -287,6 +296,7 @@ install_skill() {
       if [[ -n "${DRY_RUN:-}" ]]; then
         echo "      - references/"
       else
+        mkdir -p "$skill_dir/references"
         cp -r "$refs"/* "$skill_dir/references/" 2>/dev/null || true
         echo "      + references/"
       fi
@@ -316,9 +326,10 @@ install_commands() {
 
 install_all_skills() {
   echo "  [Skills]"
-  install_skill "xscriptor" "$SKILLS_SRC/web/literature/xscriptor" "$SKILLS_DST"
-  install_skill "devx" "$SKILLS_SRC/web/dev/devx/devx" "$SKILLS_DST"
-  install_skill "samurai" "$SKILLS_SRC/web/cybersec/samurai" "$SKILLS_DST"
+  install_skill "xscriptor" "$SKILLS_SRC/web-fullstack/portfolio/xscriptor" "$SKILLS_DST"
+  install_skill "devx" "$SKILLS_SRC/web-fullstack/devtools/devx" "$SKILLS_DST"
+  install_skill "samurai" "$SKILLS_SRC/web-fullstack/platform/samurai" "$SKILLS_DST"
+  install_skill "xglassmorphism" "$SKILLS_SRC/web-fullstack/design/xglassmorphism" "$SKILLS_DST"
   for sk in "${SENIOR_SKILLS[@]}"; do
     install_skill "$sk" "$SENIOR_SKILLS_SRC/$sk" "$SKILLS_DST"
   done
